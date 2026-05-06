@@ -6,12 +6,12 @@ Verifies that:
   2. last_login_results is correctly populated via the prefetch cache.
   3. associated_authenticators / authenticators response fields remain accurate.
 """
+
 import pytest
 from ansible_base.authentication.models import AuthenticatorUser
 from ansible_base.lib.utils.response import get_relative_url
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -85,9 +85,7 @@ def test_last_login_results_populated_via_prefetch(admin_api_client, local_authe
     assert "last_login_results" in response.data, "last_login_results absent from admin response"
 
     results = response.data["last_login_results"]
-    assert local_authenticator.id in results, (
-        f"Expected provider id {local_authenticator.id} in last_login_results, got keys: {list(results.keys())}"
-    )
+    assert local_authenticator.id in results, f"Expected provider id {local_authenticator.id} in last_login_results, got keys: {list(results.keys())}"
     entry = results[local_authenticator.id]
     assert entry["access_allowed"] is True
     assert entry["last_login_map_results"] == [{"map": "result"}]
@@ -113,9 +111,7 @@ def test_associated_authenticators_correct_after_prefetch(admin_api_client, loca
 
     assert response.status_code == 200
     assoc = response.data.get("associated_authenticators", {})
-    assert local_authenticator.id in assoc, (
-        f"Authenticator {local_authenticator.id} missing from associated_authenticators: {assoc}"
-    )
+    assert local_authenticator.id in assoc, f"Authenticator {local_authenticator.id} missing from associated_authenticators: {assoc}"
     assert assoc[local_authenticator.id]["uid"] == "assoc_uid"
 
 
@@ -132,6 +128,4 @@ def test_last_login_results_absent_for_unprivileged_user(user_api_client, local_
 
     # Regular users can view basic details but not last_login_results of others
     if response.status_code == 200:
-        assert "last_login_results" not in response.data, (
-            "last_login_results must not be exposed to unprivileged users viewing another user"
-        )
+        assert "last_login_results" not in response.data, "last_login_results must not be exposed to unprivileged users viewing another user"

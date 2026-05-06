@@ -33,11 +33,7 @@ class UserViewSet(DABOAuth2UserViewsetMixin, ResourceAPIUpdateMixin, GatewayMode
     resource_purpose = "authenticated platform users with permissions assigned directly or via team membership"
 
     model = User
-    queryset = (
-        User.objects.select_related("resource", "last_login_from")
-        .prefetch_related(PREFETCH_AUTHENTICATOR_USERS)
-        .all()
-    )
+    queryset = User.objects.select_related("resource", "last_login_from").prefetch_related(PREFETCH_AUTHENTICATOR_USERS).all()
     serializer_class = UserSerializer
     permission_classes = [OAuth2ScopePermission, AnsibleBaseUserPermissions]
 
@@ -52,11 +48,7 @@ class UserViewSet(DABOAuth2UserViewsetMixin, ResourceAPIUpdateMixin, GatewayMode
 
     def get_queryset(self):
         if self.detail:
-            return (
-                User.all_objects.select_related("resource", "last_login_from")
-                .prefetch_related(PREFETCH_AUTHENTICATOR_USERS)
-                .all()
-            )
+            return User.all_objects.select_related("resource", "last_login_from").prefetch_related(PREFETCH_AUTHENTICATOR_USERS).all()
         return super().get_queryset()
 
     @action(detail=True, methods=["get"], url_name="authenticators-list")
@@ -89,11 +81,7 @@ class DeprecatedRelatedUserViewSet(DABOAuth2UserViewsetMixin, GatewayModelViewSe
     """
 
     model = User
-    queryset = (
-        User.objects.select_related("resource", "last_login_from")
-        .prefetch_related(PREFETCH_AUTHENTICATOR_USERS)
-        .all()
-    )
+    queryset = User.objects.select_related("resource", "last_login_from").prefetch_related(PREFETCH_AUTHENTICATOR_USERS).all()
     serializer_class = UserSerializer
     permission_classes = [OAuth2ScopePermission, AnsibleBaseUserPermissions]
 
