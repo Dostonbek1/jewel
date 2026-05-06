@@ -16,6 +16,13 @@ from aap_gateway_api.models import User
 from aap_gateway_api.serializers import UserSerializer
 from aap_gateway_api.views.api.v1.common import GatewayModelViewSet, ResourceAPIUpdateMixin
 
+# Single source of truth for the user queryset prefetch chain used by all user viewsets.
+# Adding provider via select_related prevents N+1 when serializer reads authentication.provider.
+PREFETCH_AUTHENTICATOR_USERS = Prefetch(
+    'authenticator_users',
+    queryset=AuthenticatorUser.objects.select_related('provider'),
+)
+
 
 @extend_schema(responses=UserSerializer)
 class UserViewSet(DABOAuth2UserViewsetMixin, ResourceAPIUpdateMixin, GatewayModelViewSet):
@@ -28,7 +35,7 @@ class UserViewSet(DABOAuth2UserViewsetMixin, ResourceAPIUpdateMixin, GatewayMode
     model = User
     queryset = (
         User.objects.select_related("resource", "last_login_from")
-        .prefetch_related(Prefetch('authenticator_users', queryset=AuthenticatorUser.objects.select_related('provider')))
+        .prefetch_related(PREFETCH_AUTHENTICATOR_USERS)
         .all()
     )
     serializer_class = UserSerializer
@@ -47,7 +54,7 @@ class UserViewSet(DABOAuth2UserViewsetMixin, ResourceAPIUpdateMixin, GatewayMode
         if self.detail:
             return (
                 User.all_objects.select_related("resource", "last_login_from")
-                .prefetch_related(Prefetch('authenticator_users', queryset=AuthenticatorUser.objects.select_related('provider')))
+                .prefetch_related(PREFETCH_AUTHENTICATOR_USERS)
                 .all()
             )
         return super().get_queryset()
@@ -84,7 +91,7 @@ class DeprecatedRelatedUserViewSet(DABOAuth2UserViewsetMixin, GatewayModelViewSe
     model = User
     queryset = (
         User.objects.select_related("resource", "last_login_from")
-        .prefetch_related(Prefetch('authenticator_users', queryset=AuthenticatorUser.objects.select_related('provider')))
+        .prefetch_related(PREFETCH_AUTHENTICATOR_USERS)
         .all()
     )
     serializer_class = UserSerializer
