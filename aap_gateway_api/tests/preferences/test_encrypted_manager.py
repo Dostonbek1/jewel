@@ -43,4 +43,18 @@ class TestEncryptedManager:
         assert manager.from_cache("testing", "test_encrypted_manager_none_preference") is None
 
     def test_many_from_cache(self):
-        pass
+        from aap_gateway_api.preferences import gateway_preference_registry
+
+        pref_obj = gateway_preference_registry.get("test_encrypted_manager_preference", "testing")
+        pref_none_obj = gateway_preference_registry.get("test_encrypted_manager_none_preference", "testing")
+
+        db_pref = preferences.gateway_preference_manager.get_db_pref("testing", "test_encrypted_manager_preference")
+        db_pref_none = preferences.gateway_preference_manager.get_db_pref("testing", "test_encrypted_manager_none_preference")
+
+        manager = preferences.gateway_preference_manager
+        manager.to_cache(db_pref)
+        manager.to_cache(db_pref_none)
+
+        result = manager.many_from_cache([pref_obj, pref_none_obj])
+        assert result["testing__test_encrypted_manager_preference"] == ["some_value"]
+        assert result["testing__test_encrypted_manager_none_preference"] is None
