@@ -172,6 +172,10 @@ class TestGatewayRoleUserAssignmentViewSet(TestAssignmentSyncMixin):
         mock_direct_client = Mock()
         mock_direct_client_class.return_value = mock_direct_client
 
+        mock_response = Mock()
+        mock_response.json.return_value = {'parent_reference': '1'}
+        mock_direct_client._sync_assignment.return_value = mock_response
+
         data = {'user': regular_user.id, 'object_id': mock_inventory.object_id, 'role_definition': service_role_definition.id}
 
         response = admin_api_client.post(self.get_assignment_url(), data)
@@ -182,9 +186,9 @@ class TestGatewayRoleUserAssignmentViewSet(TestAssignmentSyncMixin):
         assignment = RoleUserAssignment.objects.get(user=regular_user, object_id=mock_inventory.object_id, role_definition=service_role_definition)
         assert assignment is not None
 
-        # Verify direct client was used for service-specific role
+        # Verify direct client was used for pre-sync to service
         mock_direct_client_class.assert_called_once_with(service_api_route, user=ANY, raise_if_bad_request=True)
-        mock_direct_client.sync_assignment.assert_called_once_with(assignment)
+        mock_direct_client._sync_assignment.assert_called_once()
 
     @patch('aap_gateway_api.views.api.v1.role.GWResourceAPIClient')
     @patch('aap_gateway_api.models.ServiceAPIRoute.objects.get')
@@ -196,14 +200,14 @@ class TestGatewayRoleUserAssignmentViewSet(TestAssignmentSyncMixin):
         mock_direct_client = Mock()
         mock_direct_client_class.return_value = mock_direct_client
 
-        # Mock HTTP error response
+        # Mock HTTP error response from _sync_assignment (pre-sync to service)
         mock_response = Mock()
         mock_response.status_code = 400
         mock_response.json.return_value = {'error': 'Bad request from service'}
 
         http_error = requests.HTTPError()
         http_error.response = mock_response
-        mock_direct_client.sync_assignment.side_effect = http_error
+        mock_direct_client._sync_assignment.side_effect = http_error
 
         data = {'user': regular_user.id, 'object_id': organization.id, 'role_definition': service_role_definition.id}
 
@@ -223,7 +227,7 @@ class TestGatewayRoleUserAssignmentViewSet(TestAssignmentSyncMixin):
         mock_direct_client = Mock()
         mock_direct_client_class.return_value = mock_direct_client
 
-        # Mock HTTP error response with non-JSON content
+        # Mock HTTP error response with non-JSON content from _sync_assignment
         mock_response = Mock()
         mock_response.status_code = 500
         mock_response.json.side_effect = Exception("Not JSON")
@@ -231,7 +235,7 @@ class TestGatewayRoleUserAssignmentViewSet(TestAssignmentSyncMixin):
 
         http_error = requests.HTTPError()
         http_error.response = mock_response
-        mock_direct_client.sync_assignment.side_effect = http_error
+        mock_direct_client._sync_assignment.side_effect = http_error
 
         data = {'user': regular_user.id, 'object_id': organization.id, 'role_definition': service_role_definition.id}
 
@@ -390,6 +394,10 @@ class TestGatewayRoleTeamAssignmentViewSet(TestAssignmentSyncMixin):
         mock_direct_client = Mock()
         mock_direct_client_class.return_value = mock_direct_client
 
+        mock_response = Mock()
+        mock_response.json.return_value = {'parent_reference': '1'}
+        mock_direct_client._sync_assignment.return_value = mock_response
+
         data = {'team': team.id, 'object_id': mock_inventory.object_id, 'role_definition': service_role_definition.id}
 
         response = admin_api_client.post(self.get_assignment_url(), data)
@@ -400,9 +408,9 @@ class TestGatewayRoleTeamAssignmentViewSet(TestAssignmentSyncMixin):
         assignment = RoleTeamAssignment.objects.get(team=team, object_id=mock_inventory.object_id, role_definition=service_role_definition)
         assert assignment is not None
 
-        # Verify direct client was used for service-specific role
+        # Verify direct client was used for pre-sync to service
         mock_direct_client_class.assert_called_once_with(service_api_route, user=ANY, raise_if_bad_request=True)
-        mock_direct_client.sync_assignment.assert_called_once_with(assignment)
+        mock_direct_client._sync_assignment.assert_called_once()
 
     @patch('aap_gateway_api.views.api.v1.common.AllServicesClient')
     def test_delete_team_assignment_gateway_owned_role(self, mock_client_class, admin_api_client, team, organization, gateway_role_definition):
@@ -631,6 +639,10 @@ class TestAssignmentSyncMixinMethods:
         mock_direct_client = Mock()
         mock_direct_client_class.return_value = mock_direct_client
 
+        mock_response = Mock()
+        mock_response.json.return_value = {'parent_reference': '1'}
+        mock_direct_client._sync_assignment.return_value = mock_response
+
         data = {'user': regular_user.id, 'object_id': mock_galaxy_collection.object_id, 'role_definition': galaxy_role_definition.id}
 
         response = admin_api_client.post(self.get_assignment_url(), data)
@@ -644,6 +656,6 @@ class TestAssignmentSyncMixinMethods:
         # Verify ServiceAPIRoute lookup used 'galaxy' api_slug (not 'hub')
         mock_service_get.assert_called_once_with(api_slug='galaxy')
 
-        # Verify direct client was used for service-specific role
+        # Verify direct client was used for pre-sync to service
         mock_direct_client_class.assert_called_once_with(galaxy_service_api_route, user=ANY, raise_if_bad_request=True)
-        mock_direct_client.sync_assignment.assert_called_once_with(assignment)
+        mock_direct_client._sync_assignment.assert_called_once()
