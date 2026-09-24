@@ -245,6 +245,32 @@ class TestGatewayRoleUserAssignmentViewSet(TestAssignmentSyncMixin):
         assert response.status_code == 500
         assert response.data == {'detail': 'Internal Server Error'}
 
+    @patch('aap_gateway_api.views.api.v1.role.GWResourceAPIClient')
+    @patch('aap_gateway_api.models.ServiceAPIRoute.objects.get')
+    def test_delete_assignment_service_http_error_no_json(
+        self, mock_service_get, mock_direct_client_class, admin_api_client, regular_user, mock_inventory, service_role_definition, service_api_route
+    ):
+        """Test HTTP error handling when unassignment returns non-JSON error"""
+        assignment = service_role_definition.give_permission(regular_user, mock_inventory)
+
+        mock_service_get.return_value = service_api_route
+        mock_direct_client = Mock()
+        mock_direct_client_class.return_value = mock_direct_client
+
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.json.side_effect = Exception("Not JSON")
+        mock_response.text = "Internal Server Error"
+
+        http_error = requests.HTTPError()
+        http_error.response = mock_response
+        mock_direct_client.sync_unassignment.side_effect = http_error
+
+        response = admin_api_client.delete(self.get_assignment_detail_url(assignment.id))
+
+        assert response.status_code == 500
+        assert response.data == {'detail': 'Internal Server Error'}
+
     @patch('aap_gateway_api.views.api.v1.common.AllServicesClient')
     def test_delete_assignment_gateway_owned_role(self, mock_client_class, admin_api_client, regular_user, organization, gateway_role_definition):
         """Test deleting role assignment for gateway-owned role definition"""
@@ -512,6 +538,79 @@ class TestAssignmentSyncMixinMethods:
 
         result = viewset_instance._is_owned_by_gateway(mock_role_def)
         assert result is False
+
+    def _make_pre_sync_serializer(self, role_definition, actor):
+        serializer = Mock()
+        serializer.validated_data = {
+            'role_definition': role_definition,
+            'user': actor,
+        }
+        serializer.Meta = Mock()
+        serializer.Meta.model = RoleUserAssignment
+        return serializer
+
+    def test_pre_sync_to_service_obj_none_and_user_without_resource(self, viewset_instance):
+        """Cover false branches when content object is None and user has no resource."""
+        mock_client = Mock()
+        viewset_instance.get_direct_client = Mock(return_value=mock_client)
+        mock_response = Mock()
+        mock_response.json.return_value = {'parent_reference': ''}
+        mock_client._sync_assignment.return_value = mock_response
+
+        mock_role_def = Mock()
+        mock_role_def.name = 'AWX Inventory Role'
+        mock_role_def.content_type.service = 'awx'
+
+        actor = Mock()
+        actor.resource.ansible_id = 'actor-aid'
+
+        # User without a resource attribute
+        viewset_instance.request.user = Mock(spec=[])
+
+        serializer = self._make_pre_sync_serializer(mock_role_def, actor)
+        serializer.get_object_from_data.return_value = None
+
+        result = viewset_instance._pre_sync_to_service(serializer)
+
+        assert result is None
+        call_data = mock_client._sync_assignment.call_args[0][0]
+        assert 'object_id' not in call_data
+        assert 'created_by_ansible_id' not in call_data
+        assert call_data['user_ansible_id'] == 'actor-aid'
+
+    def test_pre_sync_to_service_http_error_non_json(self, viewset_instance):
+        """Cover fallback to response.text when service error body is not JSON."""
+        from aap_gateway_api.views.api.v1.role import ProxyAPIException
+
+        mock_client = Mock()
+        viewset_instance.get_direct_client = Mock(return_value=mock_client)
+
+        mock_response = Mock()
+        mock_response.status_code = 502
+        mock_response.json.side_effect = ValueError("No JSON")
+        mock_response.text = "Bad Gateway"
+
+        http_error = requests.HTTPError()
+        http_error.response = mock_response
+        mock_client._sync_assignment.side_effect = http_error
+
+        mock_role_def = Mock()
+        mock_role_def.name = 'AWX Inventory Role'
+        mock_role_def.content_type.service = 'awx'
+
+        actor = Mock()
+        actor.resource.ansible_id = 'actor-aid'
+        viewset_instance.request.user = Mock()
+        viewset_instance.request.user.resource.ansible_id = 'creator-aid'
+
+        serializer = self._make_pre_sync_serializer(mock_role_def, actor)
+        serializer.get_object_from_data.return_value = Mock(pk=42)
+
+        with pytest.raises(ProxyAPIException) as exc_info:
+            viewset_instance._pre_sync_to_service(serializer)
+
+        assert exc_info.value.status_code == 502
+        assert exc_info.value.detail == 'Bad Gateway'
 
     @patch('aap_gateway_api.views.api.v1.role.GWResourceAPIClient')
     @patch('aap_gateway_api.models.ServiceAPIRoute.objects.get')
