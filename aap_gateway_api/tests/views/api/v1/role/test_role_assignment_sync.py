@@ -186,9 +186,13 @@ class TestGatewayRoleUserAssignmentViewSet(TestAssignmentSyncMixin):
         assignment = RoleUserAssignment.objects.get(user=regular_user, object_id=mock_inventory.object_id, role_definition=service_role_definition)
         assert assignment is not None
 
-        # Verify direct client was used for pre-sync to service
+        # Verify direct client was used for pre-sync to service with expected payload
         mock_direct_client_class.assert_called_once_with(service_api_route, user=ANY, raise_if_bad_request=True)
         mock_direct_client._sync_assignment.assert_called_once()
+        call_data = mock_direct_client._sync_assignment.call_args[0][0]
+        assert call_data['role_definition'] == service_role_definition.name
+        assert call_data['user_ansible_id'] == str(regular_user.resource.ansible_id)
+        assert call_data['object_id'] == str(mock_inventory.object_id)
 
     @patch('aap_gateway_api.views.api.v1.role.GWResourceAPIClient')
     @patch('aap_gateway_api.models.ServiceAPIRoute.objects.get')
@@ -434,9 +438,13 @@ class TestGatewayRoleTeamAssignmentViewSet(TestAssignmentSyncMixin):
         assignment = RoleTeamAssignment.objects.get(team=team, object_id=mock_inventory.object_id, role_definition=service_role_definition)
         assert assignment is not None
 
-        # Verify direct client was used for pre-sync to service
+        # Verify direct client was used for pre-sync to service with expected payload
         mock_direct_client_class.assert_called_once_with(service_api_route, user=ANY, raise_if_bad_request=True)
         mock_direct_client._sync_assignment.assert_called_once()
+        call_data = mock_direct_client._sync_assignment.call_args[0][0]
+        assert call_data['role_definition'] == service_role_definition.name
+        assert call_data['team_ansible_id'] == str(team.resource.ansible_id)
+        assert call_data['object_id'] == str(mock_inventory.object_id)
 
     @patch('aap_gateway_api.views.api.v1.common.AllServicesClient')
     def test_delete_team_assignment_gateway_owned_role(self, mock_client_class, admin_api_client, team, organization, gateway_role_definition):

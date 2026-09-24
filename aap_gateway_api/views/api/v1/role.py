@@ -3,7 +3,8 @@ import logging
 
 from ansible_base.rbac.api.serializers import RoleDefinitionSerializer, RoleTeamAssignmentSerializer
 from ansible_base.rbac.api.views import BaseAssignmentViewSet, RoleDefinitionViewSet, RoleTeamAssignmentViewSet, RoleUserAssignmentViewSet
-from ansible_base.rbac.policies import can_view_all_users
+from ansible_base.rbac.policies import can_view_all_users, check_content_obj_permission
+from ansible_base.rbac.validators import check_locally_managed
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from requests.exceptions import HTTPError
@@ -131,7 +132,7 @@ class AssignmentSyncMixin(ResourceAllClientMixin):
         service = ServiceAPIRoute.objects.get(api_slug=service_name)
         return GWResourceAPIClient(service, user=self.request.user, raise_if_bad_request=True)
 
-    def _pre_sync_to_service(self, serializer):
+    def _pre_sync_to_service(self, serializer, obj=None):
         """Sync assignment to the owning service BEFORE local creation.
 
         For service-owned resources, the service knows the parent organization.
@@ -146,7 +147,8 @@ class AssignmentSyncMixin(ResourceAllClientMixin):
         actor_type = 'user' if serializer.Meta.model._meta.model_name == 'roleuserassignment' else 'team'
         data[f'{actor_type}_ansible_id'] = str(actor.resource.ansible_id)
 
-        obj = serializer.get_object_from_data(serializer.validated_data, rd, self.request.user)
+        if obj is None:
+            obj = serializer.get_object_from_data(serializer.validated_data, rd, self.request.user)
         if obj is not None:
             data['object_id'] = str(obj.pk)
 
@@ -191,8 +193,21 @@ class AssignmentSyncMixin(ResourceAllClientMixin):
         rd = serializer.validated_data.get('role_definition')
 
         if rd and not self._is_owned_by_gateway(rd):
-            obj = self._pre_sync_to_service(serializer)
+            requesting_user = self.request.user
             actor = serializer.validated_data.get('user') or serializer.validated_data.get('team')
+            obj = serializer.get_object_from_data(serializer.validated_data, rd, requesting_user)
+
+            # Run the same DAB checks BaseAssignmentSerializer.create() would,
+            # before syncing to the owning service (avoids creating upstream
+            # assignments that local authz would reject).
+            if obj is not None and getattr(obj, 'validate_role_assignment', None):
+                obj.validate_role_assignment(actor, rd, requesting_user=requesting_user)
+            check_locally_managed(rd)
+            if not obj:
+                raise ValidationError({'object_id': _('Object must be specified for this role assignment')})
+            check_content_obj_permission(requesting_user, obj)
+
+            obj = self._pre_sync_to_service(serializer, obj=obj)
 
             with transaction.atomic():
                 assignment = rd.give_permission(actor, obj)
