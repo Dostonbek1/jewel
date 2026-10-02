@@ -311,7 +311,7 @@ podman-preflight:
 		echo "Error: Podman is required. Install Podman $(PODMAN_MIN_VERSION) or newer."; \
 		exit 1; \
 	fi; \
-	podman_version="$$($(PODMAN) version --format '{{.Client.Version}}' 2>/dev/null || true)"; \
+	podman_version="$$("$(PODMAN)" version --format '{{.Client.Version}}' 2>/dev/null || true)"; \
 	if [ -z "$$podman_version" ] || ! version_at_least "$$podman_version" "$(PODMAN_MIN_VERSION)"; then \
 		echo "Error: Podman $(PODMAN_MIN_VERSION) or newer is required (found: $${podman_version:-unknown})."; \
 		exit 1; \

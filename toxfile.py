@@ -136,8 +136,14 @@ def run_podman(*args: str, timeout: Optional[float] = None) -> subprocess.Comple
 
 def published_port(name: str, exposed_port: ExposedPort) -> str:
     result = run_podman("port", name, exposed_port.value, timeout=5)
-    address = result.stdout.strip().splitlines()[0]
-    return address.rsplit(":", 1)[1]
+    lines = result.stdout.strip().splitlines()
+    if not lines:
+        raise Fail(f"No port mapping found for {name} {exposed_port.value}")
+    address = lines[0]
+    parts = address.rsplit(":", 1)
+    if len(parts) != 2 or not parts[1]:
+        raise Fail(f"Unexpected port format from podman port: {address!r}")
+    return parts[1]
 
 
 def stop_container(name: str) -> None:
