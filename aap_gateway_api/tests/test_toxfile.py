@@ -68,6 +68,7 @@ def test_published_port_parses_mapping(stdout, expected):
 )
 def test_published_port_raises_on_invalid_output(stdout):
     result = MagicMock(stdout=stdout)
+    exposed_port = ExposedPort("DB_PORT=5432/tcp")
     with patch.object(toxfile, "run_podman", return_value=result):
         with pytest.raises(Fail):
-            published_port("tox-podman-db", ExposedPort("DB_PORT=5432/tcp"))
+            published_port("tox-podman-db", exposed_port)
