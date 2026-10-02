@@ -3,6 +3,9 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+pytest.importorskip("tox")
+
 from tox.tox_env.errors import Fail
 
 import toxfile
