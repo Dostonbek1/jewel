@@ -11,7 +11,7 @@
 - name: Install OIDC adapter
   include_tasks: plumb_oidc.yml
 
-- name: Install external OAuth adapter
+- name: Install OAuth Bearer adapter
   include_tasks: plumb_oauth_bearer.yml
 
 - name: Install SAML adapter
