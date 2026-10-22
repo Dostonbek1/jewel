@@ -319,7 +319,7 @@ Gateway authenticators:
 
 - `Dev Keycloak OIDC` for browser-based Keycloak login;
 - `Dev Keycloak SAML` for SAML login; and
-- `Dev Keycloak External OAuth` for bearer-token API authentication work.
+- `Dev Keycloak OAuth Bearer Token` for bearer-token API authentication work.
 
 The external OAuth authenticator uses the Keycloak service hostname on the
 container network for its issuer and JWKS endpoints. It is intentionally
